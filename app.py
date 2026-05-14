@@ -1,17 +1,31 @@
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
+from flask import (
+    Flask, render_template, request, jsonify, send_file,
+    redirect, url_for, session, abort,
+)
 import sqlite3
 import json
 import io
+import os
+import secrets
+from functools import wraps
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 from pdf_generator import generate_sacs_pdf, generate_tcc_pdf
 
 app = Flask(__name__)
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 DB_PATH = "portal.db"
+
+ROLES = ("admin", "planner", "assistant")
+
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
 
 def init_db():
     conn = get_db()
@@ -30,11 +44,19 @@ def init_db():
             created_at TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (client_id) REFERENCES clients(id)
         );
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            full_name TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('admin','planner','assistant')),
+            created_at TEXT DEFAULT (datetime('now'))
+        );
     """)
     conn.commit()
-    # Seed a demo client if none exist
-    cur = conn.execute("SELECT COUNT(*) FROM clients")
-    if cur.fetchone()[0] == 0:
+
+    # Seed demo client
+    if conn.execute("SELECT COUNT(*) FROM clients").fetchone()[0] == 0:
         demo = {
             "name1": "James", "name2": "Sarah", "last_name": "Patterson",
             "dob1": "1968-04-12", "dob2": "1971-09-23",
@@ -55,13 +77,203 @@ def init_db():
             "liabilities": [
                 {"type": "Mortgage", "last4": "9921", "rate": 3.25},
                 {"type": "Auto Loan", "last4": "4410", "rate": 5.99},
-            ]
+            ],
         }
         conn.execute("INSERT INTO clients (data) VALUES (?)", [json.dumps(demo)])
         conn.commit()
+
+    # Seed default team users
+    if conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:
+        default_pw = os.environ.get("DEFAULT_USER_PASSWORD", "TempPass2026!")
+        users = [
+            ("andrew",  "Andrew",  "admin"),
+            ("rebecca", "Rebecca", "planner"),
+            ("maryann", "Maryann", "assistant"),
+        ]
+        for u, name, role in users:
+            conn.execute(
+                "INSERT INTO users (username, password_hash, full_name, role) VALUES (?,?,?,?)",
+                [u, generate_password_hash(default_pw), name, role],
+            )
+        conn.commit()
+        print(f"[init_db] Seeded default users with temporary password: {default_pw}")
+        for u, name, role in users:
+            print(f"          {u:<10} ({role})")
+        print("[init_db] Each user should change their password after first login.")
+
     conn.close()
 
+
+# ─── Auth helpers ─────────────────────────────────────────────────────────────
+
+def login_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("login", next=request.path))
+        return f(*args, **kwargs)
+    return wrapper
+
+
+def role_required(*roles):
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            if "user_id" not in session:
+                return redirect(url_for("login", next=request.path))
+            if session.get("role") not in roles:
+                return render_template("forbidden.html"), 403
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+@app.context_processor
+def inject_user():
+    if "user_id" in session:
+        return {
+            "current_user": {
+                "id": session["user_id"],
+                "username": session["username"],
+                "full_name": session["full_name"],
+                "role": session["role"],
+            }
+        }
+    return {"current_user": None}
+
+
+# ─── Auth routes ──────────────────────────────────────────────────────────────
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip().lower()
+        password = request.form.get("password") or ""
+        conn = get_db()
+        row = conn.execute(
+            "SELECT id, username, password_hash, full_name, role FROM users WHERE username=?",
+            [username],
+        ).fetchone()
+        conn.close()
+        if row and check_password_hash(row["password_hash"], password):
+            session.clear()
+            session["user_id"] = row["id"]
+            session["username"] = row["username"]
+            session["full_name"] = row["full_name"]
+            session["role"] = row["role"]
+            nxt = request.args.get("next") or url_for("index")
+            return redirect(nxt)
+        return render_template(
+            "login.html", error="Invalid username or password.", username=username
+        ), 401
+
+    if "user_id" in session:
+        return redirect(url_for("index"))
+    return render_template("login.html", error=None, username="")
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
+@app.route("/account", methods=["GET", "POST"])
+@login_required
+def account():
+    msg = err = None
+    if request.method == "POST":
+        current = request.form.get("current_password") or ""
+        new = request.form.get("new_password") or ""
+        confirm = request.form.get("confirm_password") or ""
+        conn = get_db()
+        row = conn.execute(
+            "SELECT password_hash FROM users WHERE id=?", [session["user_id"]]
+        ).fetchone()
+        if not row or not check_password_hash(row["password_hash"], current):
+            err = "Current password is incorrect."
+        elif len(new) < 8:
+            err = "New password must be at least 8 characters."
+        elif new != confirm:
+            err = "New password and confirmation do not match."
+        else:
+            conn.execute(
+                "UPDATE users SET password_hash=? WHERE id=?",
+                [generate_password_hash(new), session["user_id"]],
+            )
+            conn.commit()
+            msg = "Password updated successfully."
+        conn.close()
+    return render_template("account.html", msg=msg, err=err)
+
+
+# ─── Admin: user management ───────────────────────────────────────────────────
+
+@app.route("/admin/users", methods=["GET", "POST"])
+@role_required("admin")
+def admin_users():
+    conn = get_db()
+    msg = err = None
+    if request.method == "POST":
+        username = (request.form.get("username") or "").strip().lower()
+        full_name = (request.form.get("full_name") or "").strip()
+        role = request.form.get("role") or "assistant"
+        password = request.form.get("password") or ""
+        if not username or not full_name:
+            err = "Username and full name are required."
+        elif len(password) < 8:
+            err = "Password must be at least 8 characters."
+        elif role not in ROLES:
+            err = "Invalid role."
+        elif conn.execute("SELECT 1 FROM users WHERE username=?", [username]).fetchone():
+            err = f"Username '{username}' already exists."
+        else:
+            conn.execute(
+                "INSERT INTO users (username, password_hash, full_name, role) VALUES (?,?,?,?)",
+                [username, generate_password_hash(password), full_name, role],
+            )
+            conn.commit()
+            msg = f"User '{username}' created."
+    users = conn.execute(
+        "SELECT id, username, full_name, role, created_at FROM users ORDER BY id"
+    ).fetchall()
+    conn.close()
+    return render_template("admin_users.html", users=users, msg=msg, err=err)
+
+
+@app.route("/admin/users/<int:uid>/delete", methods=["POST"])
+@role_required("admin")
+def admin_delete_user(uid):
+    if uid == session["user_id"]:
+        # Prevent self-deletion (would lock out the only admin)
+        return redirect(url_for("admin_users"))
+    conn = get_db()
+    conn.execute("DELETE FROM users WHERE id=?", [uid])
+    conn.commit()
+    conn.close()
+    return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/users/<int:uid>/reset_password", methods=["POST"])
+@role_required("admin")
+def admin_reset_password(uid):
+    new_pw = request.form.get("new_password") or ""
+    if len(new_pw) < 8:
+        return redirect(url_for("admin_users"))
+    conn = get_db()
+    conn.execute(
+        "UPDATE users SET password_hash=? WHERE id=?",
+        [generate_password_hash(new_pw), uid],
+    )
+    conn.commit()
+    conn.close()
+    return redirect(url_for("admin_users"))
+
+
+# ─── Client + report routes (all require login) ───────────────────────────────
+
 @app.route("/")
+@login_required
 def index():
     conn = get_db()
     rows = conn.execute("SELECT id, data, updated_at FROM clients ORDER BY id").fetchall()
@@ -69,19 +281,25 @@ def index():
     for r in rows:
         d = json.loads(r["data"])
         last_report = conn.execute(
-            "SELECT quarter, created_at FROM reports WHERE client_id=? ORDER BY id DESC LIMIT 1", [r["id"]]
+            "SELECT quarter, created_at FROM reports WHERE client_id=? ORDER BY id DESC LIMIT 1",
+            [r["id"]],
         ).fetchone()
         clients.append({
             "id": r["id"],
-            "full_name": f"{d.get('name1','')} & {d.get('name2','')} {d.get('last_name','')}".strip() if d.get('name2') else f"{d.get('name1','')} {d.get('last_name','')}",
+            "full_name": (
+                f"{d.get('name1','')} & {d.get('name2','')} {d.get('last_name','')}".strip()
+                if d.get("name2") else f"{d.get('name1','')} {d.get('last_name','')}"
+            ),
             "last_report": last_report["quarter"] if last_report else None,
             "last_report_date": last_report["created_at"][:10] if last_report else None,
-            "updated_at": r["updated_at"][:10]
+            "updated_at": r["updated_at"][:10],
         })
     conn.close()
     return render_template("index.html", clients=clients)
 
-@app.route("/client/new", methods=["GET","POST"])
+
+@app.route("/client/new", methods=["GET", "POST"])
+@login_required
 def new_client():
     if request.method == "POST":
         data = request.json
@@ -92,12 +310,17 @@ def new_client():
         return jsonify({"ok": True})
     return render_template("client_form.html", client=None, client_id=None)
 
-@app.route("/client/<int:cid>/edit", methods=["GET","POST"])
+
+@app.route("/client/<int:cid>/edit", methods=["GET", "POST"])
+@login_required
 def edit_client(cid):
     conn = get_db()
     if request.method == "POST":
         data = request.json
-        conn.execute("UPDATE clients SET data=?, updated_at=datetime('now') WHERE id=?", [json.dumps(data), cid])
+        conn.execute(
+            "UPDATE clients SET data=?, updated_at=datetime('now') WHERE id=?",
+            [json.dumps(data), cid],
+        )
         conn.commit()
         conn.close()
         return jsonify({"ok": True})
@@ -106,7 +329,9 @@ def edit_client(cid):
     client = json.loads(row["data"])
     return render_template("client_form.html", client=client, client_id=cid)
 
-@app.route("/client/<int:cid>/report", methods=["GET","POST"])
+
+@app.route("/client/<int:cid>/report", methods=["GET", "POST"])
+@login_required
 def generate_report(cid):
     conn = get_db()
     row = conn.execute("SELECT data FROM clients WHERE id=?", [cid]).fetchone()
@@ -114,18 +339,31 @@ def generate_report(cid):
 
     if request.method == "POST":
         balances = request.json
-        # Calculations
         inflow = float(client["monthly_inflow"])
         outflow = float(client["monthly_outflow"])
         excess = inflow - outflow
         private_reserve_target = (6 * outflow) + float(client.get("insurance_deductibles", 0))
 
-        ret1_total = sum(float(balances.get(f"ret_{i}", 0)) for i, a in enumerate(client["retirement_accounts"]) if a["owner"] == "client1")
-        ret2_total = sum(float(balances.get(f"ret_{i}", 0)) for i, a in enumerate(client["retirement_accounts"]) if a["owner"] == "client2")
-        non_ret_total = sum(float(balances.get(f"nret_{i}", 0)) for i in range(len(client["non_retirement_accounts"])))
+        ret1_total = sum(
+            float(balances.get(f"ret_{i}", 0))
+            for i, a in enumerate(client["retirement_accounts"])
+            if a["owner"] == "client1"
+        )
+        ret2_total = sum(
+            float(balances.get(f"ret_{i}", 0))
+            for i, a in enumerate(client["retirement_accounts"])
+            if a["owner"] == "client2"
+        )
+        non_ret_total = sum(
+            float(balances.get(f"nret_{i}", 0))
+            for i in range(len(client["non_retirement_accounts"]))
+        )
         trust_value = float(balances.get("trust_value", 0))
         grand_total = ret1_total + ret2_total + non_ret_total + trust_value
-        liabilities_total = sum(float(balances.get(f"liab_{i}", 0)) for i in range(len(client.get("liabilities", []))))
+        liabilities_total = sum(
+            float(balances.get(f"liab_{i}", 0))
+            for i in range(len(client.get("liabilities", [])))
+        )
 
         report_data = {
             "client": client,
@@ -140,23 +378,32 @@ def generate_report(cid):
                 "schwab_balance": float(balances.get("schwab_balance", 0)),
             },
             "quarter": balances.get("quarter", "Q1 2026"),
-            "generated_at": datetime.now().strftime("%B %d, %Y")
+            "generated_at": datetime.now().strftime("%B %d, %Y"),
+            "generated_by": session.get("full_name", "Unknown"),
         }
 
-        cur = conn.execute("INSERT INTO reports (client_id, quarter, report_data) VALUES (?,?,?)",
-                           [cid, report_data["quarter"], json.dumps(report_data)])
+        cur = conn.execute(
+            "INSERT INTO reports (client_id, quarter, report_data) VALUES (?,?,?)",
+            [cid, report_data["quarter"], json.dumps(report_data)],
+        )
         report_id = cur.lastrowid
         conn.commit()
         conn.close()
         return jsonify({"ok": True, "report_id": report_id, "calc": report_data["calc"]})
 
-    # GET - load last balances for reference
-    last = conn.execute("SELECT report_data FROM reports WHERE client_id=? ORDER BY id DESC LIMIT 1", [cid]).fetchone()
+    last = conn.execute(
+        "SELECT report_data FROM reports WHERE client_id=? ORDER BY id DESC LIMIT 1",
+        [cid],
+    ).fetchone()
     last_balances = json.loads(last["report_data"])["balances"] if last else {}
     conn.close()
-    return render_template("report_form.html", client=client, client_id=cid, last_balances=last_balances)
+    return render_template(
+        "report_form.html", client=client, client_id=cid, last_balances=last_balances
+    )
+
 
 @app.route("/report/<int:rid>/pdf/<report_type>")
+@login_required
 def download_pdf(rid, report_type):
     conn = get_db()
     row = conn.execute("SELECT report_data FROM reports WHERE id=?", [rid]).fetchone()
@@ -174,14 +421,20 @@ def download_pdf(rid, report_type):
     buf.seek(0)
     return send_file(buf, mimetype="application/pdf", as_attachment=True, download_name=filename)
 
+
 @app.route("/client/<int:cid>/reports")
+@login_required
 def report_history(cid):
     conn = get_db()
     row = conn.execute("SELECT data FROM clients WHERE id=?", [cid]).fetchone()
     client = json.loads(row["data"])
-    reports = conn.execute("SELECT id, quarter, created_at FROM reports WHERE client_id=? ORDER BY id DESC", [cid]).fetchall()
+    reports = conn.execute(
+        "SELECT id, quarter, created_at FROM reports WHERE client_id=? ORDER BY id DESC",
+        [cid],
+    ).fetchall()
     conn.close()
     return render_template("history.html", client=client, client_id=cid, reports=reports)
+
 
 init_db()
 

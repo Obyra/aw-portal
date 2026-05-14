@@ -9,10 +9,18 @@
   :root { --blue:#1B4F8C; --blue-light:#2E6DB4; --blue-pale:#EBF2FA; --green:#2D7A3A; --red:#B22222; --gray:#F5F6F8; --gray-med:#E2E5EA; --gray-dark:#6B7280; --dark:#111827; --shadow:0 1px 3px rgba(0,0,0,.08),0 4px 12px rgba(0,0,0,.06); --radius:12px; }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:'DM Sans',sans-serif; background:#F0F3F8; color:var(--dark); }
-  nav { background:var(--blue); padding:0 40px; height:60px; display:flex; align-items:center; gap:16px; }
+  nav { background:var(--blue); padding:0 40px; height:60px; display:flex; align-items:center; justify-content:space-between; }
+  .nav-left { display:flex; align-items:center; gap:16px; }
   .nav-back { color:rgba(255,255,255,.7); text-decoration:none; font-size:13px; }
   .nav-back:hover { color:white; }
   .nav-brand { color:white; font-family:'DM Serif Display',serif; font-size:18px; }
+  .nav-user { display:flex; align-items:center; gap:12px; color:rgba(255,255,255,.92); font-size:13px; }
+  .nav-user-name { font-weight:600; }
+  .nav-role { background:rgba(255,255,255,.18); padding:3px 9px; border-radius:20px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
+  .nav-link { color:rgba(255,255,255,.85); text-decoration:none; font-size:13px; padding:5px 10px; border-radius:6px; transition:.15s; }
+  .nav-link:hover { background:rgba(255,255,255,.15); color:white; }
+  .nav-logout { background:none; border:none; color:rgba(255,255,255,.85); font-size:13px; cursor:pointer; padding:5px 10px; border-radius:6px; font-family:inherit; }
+  .nav-logout:hover { background:rgba(255,255,255,.15); color:white; }
   .container { max-width:800px; margin:0 auto; padding:40px 24px; }
 
   .page-header { margin-bottom:28px; }
@@ -80,8 +88,19 @@
 </head>
 <body>
 <nav>
-  <a href="/" class="nav-back">← Dashboard</a>
-  <div class="nav-brand">Windbrook Solutions</div>
+  <div class="nav-left">
+    <a href="/" class="nav-back">← Dashboard</a>
+    <div class="nav-brand">Windbrook Solutions</div>
+  </div>
+  <div class="nav-user">
+    <span class="nav-user-name">{{ current_user.full_name }}</span>
+    <span class="nav-role">{{ current_user.role }}</span>
+    {% if current_user.role == 'admin' %}<a href="/admin/users" class="nav-link">Team</a>{% endif %}
+    <a href="/account" class="nav-link">Account</a>
+    <form method="POST" action="/logout" style="display:inline">
+      <button type="submit" class="nav-logout">Sign out</button>
+    </form>
+  </div>
 </nav>
 <div class="err-toast" id="err-toast"></div>
 <div class="container">

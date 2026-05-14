@@ -22,8 +22,13 @@
   nav { background:var(--blue); padding:0 40px; height:60px; display:flex; align-items:center; justify-content:space-between; }
   .nav-brand { color:white; font-family:'DM Serif Display',serif; font-size:20px; letter-spacing:.3px; }
   .nav-brand span { font-family:'DM Sans',sans-serif; font-weight:300; font-size:13px; opacity:.7; margin-left:8px; }
-  .nav-btn { background:rgba(255,255,255,.15); color:white; border:none; padding:8px 18px; border-radius:8px; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; text-decoration:none; transition:.2s; }
-  .nav-btn:hover { background:rgba(255,255,255,.25); }
+  .nav-user { display:flex; align-items:center; gap:12px; color:rgba(255,255,255,.92); font-size:13px; }
+  .nav-user-name { font-weight:600; }
+  .nav-role { background:rgba(255,255,255,.18); padding:3px 9px; border-radius:20px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; }
+  .nav-link { color:rgba(255,255,255,.85); text-decoration:none; font-size:13px; padding:5px 10px; border-radius:6px; transition:.15s; }
+  .nav-link:hover { background:rgba(255,255,255,.15); color:white; }
+  .nav-logout { background:none; border:none; color:rgba(255,255,255,.85); font-size:13px; cursor:pointer; padding:5px 10px; border-radius:6px; font-family:inherit; }
+  .nav-logout:hover { background:rgba(255,255,255,.15); color:white; }
 
   /* Main */
   .container { max-width:960px; margin:0 auto; padding:40px 24px; }
@@ -64,7 +69,15 @@
 <body>
 <nav>
   <div class="nav-brand">Windbrook Solutions <span>Client Report Portal</span></div>
-  <a href="/client/new" class="nav-btn">+ New Client</a>
+  <div class="nav-user">
+    <span class="nav-user-name">{{ current_user.full_name }}</span>
+    <span class="nav-role">{{ current_user.role }}</span>
+    {% if current_user.role == 'admin' %}<a href="/admin/users" class="nav-link">Team</a>{% endif %}
+    <a href="/account" class="nav-link">Account</a>
+    <form method="POST" action="/logout" style="display:inline">
+      <button type="submit" class="nav-logout">Sign out</button>
+    </form>
+  </div>
 </nav>
 
 <div class="container">
