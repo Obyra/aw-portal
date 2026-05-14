@@ -458,6 +458,7 @@ def generate_report(cid):
             "quarter": balances.get("quarter", "Q1 2026"),
             "generated_at": datetime.now().strftime("%B %d, %Y"),
             "generated_by": session.get("full_name", "Unknown"),
+            "prepared_by": (balances.get("prepared_by") or "").strip() or session.get("full_name", "Unknown"),
         }
 
         cur = conn.execute(

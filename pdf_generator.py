@@ -59,17 +59,20 @@ def generate_sacs_pdf(buf, data):
     calc = data["calc"]
     client = data["client"]
     quarter = data["quarter"]
+    prepared_by = data.get("prepared_by") or data.get("generated_by") or "—"
 
     name = full_name(client)
 
     # ─── Header ───────────────────────────────────────────────
     c.setFillColor(BLUE)
-    c.rect(0, H - 70, W, 70, fill=1, stroke=0)
+    c.rect(0, H - 85, W, 85, fill=1, stroke=0)
     c.setFillColor(WHITE)
     c.setFont("Helvetica-Bold", 18)
-    c.drawString(40, H - 40, "Simple Automated Cash Flow System")
+    c.drawString(40, H - 38, "Simple Automated Cash Flow System")
     c.setFont("Helvetica", 11)
-    c.drawString(40, H - 58, f"{name}  |  {quarter}  |  {data['generated_at']}")
+    c.drawString(40, H - 56, f"{name}  |  {quarter}  |  {data['generated_at']}")
+    c.setFont("Helvetica-Oblique", 9)
+    c.drawString(40, H - 72, f"Prepared by: {prepared_by}")
     # Logo area
     c.setFont("Helvetica-Bold", 12)
     c.drawRightString(W - 40, H - 45, "WINDBROOK")
@@ -268,15 +271,18 @@ def generate_tcc_pdf(buf, data):
     quarter = data["quarter"]
 
     name = full_name(client)
+    prepared_by = data.get("prepared_by") or data.get("generated_by") or "—"
 
     # ─── Header ───────────────────────────────────────────────
     c.setFillColor(BLUE)
-    c.rect(0, H - 70, W, 70, fill=1, stroke=0)
+    c.rect(0, H - 85, W, 85, fill=1, stroke=0)
     c.setFillColor(WHITE)
     c.setFont("Helvetica-Bold", 18)
-    c.drawString(40, H - 40, "Total Client Chart")
+    c.drawString(40, H - 38, "Total Client Chart")
     c.setFont("Helvetica", 11)
-    c.drawString(40, H - 58, f"{name}  |  {quarter}  |  {data['generated_at']}")
+    c.drawString(40, H - 56, f"{name}  |  {quarter}  |  {data['generated_at']}")
+    c.setFont("Helvetica-Oblique", 9)
+    c.drawString(40, H - 72, f"Prepared by: {prepared_by}")
     c.setFont("Helvetica-Bold", 12)
     c.drawRightString(W - 40, H - 45, "WINDBROOK")
     c.setFont("Helvetica", 9)
@@ -383,22 +389,23 @@ def generate_tcc_pdf(buf, data):
         bal = float(balances.get(f"nret_{j}", 0))
         draw_account_bubble(start_x + j * spacing, nret_y - 30, a["type"], a["last4"], bal, r=40)
 
-    # Trust bubble (center)
-    trust_x = W / 2
-    trust_y = nret_y - 30
-    trust_val = float(balances.get("trust_value", 0))
-    c.setFillColor(HexColor("#6B8F71"))
-    c.circle(trust_x, trust_y, 48, fill=1, stroke=0)
-    c.setFillColor(WHITE)
-    c.setFont("Helvetica-Bold", 9)
-    c.drawCentredString(trust_x, trust_y + 18, "TRUST")
-    c.setFont("Helvetica", 7)
-    addr = client.get("trust", {}).get("address", "")
-    c.drawCentredString(trust_x, trust_y + 5, addr[:28])
-    c.setFont("Helvetica-Bold", 10)
-    c.drawCentredString(trust_x, trust_y - 10, fmt(trust_val))
-    c.setFont("Helvetica", 7)
-    c.drawCentredString(trust_x, trust_y - 22, "Zillow Zestimate")
+    # Trust bubble (center) — only when client has a configured trust address
+    trust_addr = (client.get("trust") or {}).get("address", "").strip()
+    if trust_addr:
+        trust_x = W / 2
+        trust_y = nret_y - 30
+        trust_val = float(balances.get("trust_value", 0))
+        c.setFillColor(HexColor("#6B8F71"))
+        c.circle(trust_x, trust_y, 48, fill=1, stroke=0)
+        c.setFillColor(WHITE)
+        c.setFont("Helvetica-Bold", 9)
+        c.drawCentredString(trust_x, trust_y + 18, "TRUST")
+        c.setFont("Helvetica", 7)
+        c.drawCentredString(trust_x, trust_y + 5, trust_addr[:28])
+        c.setFont("Helvetica-Bold", 10)
+        c.drawCentredString(trust_x, trust_y - 10, fmt(trust_val))
+        c.setFont("Helvetica", 7)
+        c.drawCentredString(trust_x, trust_y - 22, "Zillow Zestimate")
 
     # Non-ret summary
     sb_y2 = nret_y - 90

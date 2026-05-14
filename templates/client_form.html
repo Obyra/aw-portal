@@ -50,6 +50,7 @@
   .btn-primary:hover { background:var(--blue-light); }
   .btn-cancel { background:transparent; color:var(--gray-dark); border:1.5px solid var(--gray-med); padding:12px 24px; border-radius:9px; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:14px; text-decoration:none; display:inline-flex; align-items:center; }
   .toast { position:fixed; top:20px; right:20px; background:#166534; color:white; padding:14px 22px; border-radius:10px; font-weight:600; font-size:14px; display:none; z-index:999; }
+  .age-display { font-size:11px; color:var(--blue); font-weight:600; margin-top:4px; min-height:14px; }
 </style>
 </head>
 <body>
@@ -78,10 +79,18 @@
     <div class="form-grid">
       <div class="form-group"><label>First Name (Client 1)</label><input id="name1" value="{{ client.name1 if client else '' }}" placeholder="James"></div>
       <div class="form-group"><label>Last Name</label><input id="last_name" value="{{ client.last_name if client else '' }}" placeholder="Patterson"></div>
-      <div class="form-group"><label>Date of Birth</label><input id="dob1" type="date" value="{{ client.dob1 if client else '' }}"></div>
+      <div class="form-group">
+        <label>Date of Birth</label>
+        <input id="dob1" type="date" value="{{ client.dob1 if client else '' }}" oninput="updateAge('dob1','age1')">
+        <div class="age-display" id="age1"></div>
+      </div>
       <div class="form-group"><label>Last 4 SSN</label><input id="ssn1" maxlength="4" value="{{ client.ssn1 if client else '' }}" placeholder="4821"></div>
       <div class="form-group"><label>First Name (Spouse / Client 2)</label><input id="name2" value="{{ client.name2 if client else '' }}" placeholder="Sarah (optional)"></div>
-      <div class="form-group"><label>Date of Birth (Spouse)</label><input id="dob2" type="date" value="{{ client.dob2 if client else '' }}"></div>
+      <div class="form-group">
+        <label>Date of Birth (Spouse)</label>
+        <input id="dob2" type="date" value="{{ client.dob2 if client else '' }}" oninput="updateAge('dob2','age2')">
+        <div class="age-display" id="age2"></div>
+      </div>
       <div class="form-group"><label>Last 4 SSN (Spouse)</label><input id="ssn2" maxlength="4" value="{{ client.ssn2 if client else '' }}" placeholder="3094"></div>
     </div>
   </div>
@@ -183,6 +192,25 @@ function renderLiab() {
 function addLiab() { liabAccounts.push({type:'Mortgage',rate:'',last4:''}); renderLiab(); }
 
 renderRet(); renderNret(); renderLiab();
+
+function calcAge(dobStr) {
+  if (!dobStr) return null;
+  const dob = new Date(dobStr + 'T00:00:00');
+  if (isNaN(dob.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+  return age >= 0 ? age : null;
+}
+function updateAge(inputId, displayId) {
+  const age = calcAge(document.getElementById(inputId).value);
+  const el = document.getElementById(displayId);
+  el.textContent = age !== null ? `Age: ${age}` : '';
+}
+// Compute on initial load (edit-client case)
+updateAge('dob1', 'age1');
+updateAge('dob2', 'age2');
 
 async function saveClient() {
   const data = {
