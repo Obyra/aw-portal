@@ -270,12 +270,56 @@ def admin_reset_password(uid):
     return redirect(url_for("admin_users"))
 
 
+# ─── Dashboard helpers ────────────────────────────────────────────────────────
+
+STATUS_LABELS = {
+    "completed": "Completed This Quarter",
+    "pending":   "Report Pending",
+    "missing":   "Missing Data",
+    "none":      "No Report Generated",
+}
+
+
+def current_quarter_str(now=None):
+    now = now or datetime.now()
+    q = (now.month - 1) // 3 + 1
+    return f"Q{q} {now.year}"
+
+
+def client_full_name(d):
+    n1 = (d.get("name1") or "").strip()
+    n2 = (d.get("name2") or "").strip()
+    last = (d.get("last_name") or "").strip()
+    if n2:
+        return f"{n1} & {n2} {last}".strip()
+    return f"{n1} {last}".strip()
+
+
+def is_missing_static_data(d):
+    if not d.get("monthly_inflow") or not d.get("monthly_outflow"):
+        return True
+    has_accounts = bool(d.get("retirement_accounts")) or bool(d.get("non_retirement_accounts"))
+    return not has_accounts
+
+
+def client_status(d, last_quarter, cur_q):
+    if is_missing_static_data(d):
+        return "missing"
+    if not last_quarter:
+        return "none"
+    if last_quarter == cur_q:
+        return "completed"
+    return "pending"
+
+
 # ─── Client + report routes (all require login) ───────────────────────────────
 
 @app.route("/")
 @login_required
 def index():
     conn = get_db()
+    cur_q = current_quarter_str()
+
     rows = conn.execute("SELECT id, data, updated_at FROM clients ORDER BY id").fetchall()
     clients = []
     for r in rows:
@@ -284,18 +328,52 @@ def index():
             "SELECT quarter, created_at FROM reports WHERE client_id=? ORDER BY id DESC LIMIT 1",
             [r["id"]],
         ).fetchone()
+        last_q = last_report["quarter"] if last_report else None
+        status = client_status(d, last_q, cur_q)
         clients.append({
             "id": r["id"],
-            "full_name": (
-                f"{d.get('name1','')} & {d.get('name2','')} {d.get('last_name','')}".strip()
-                if d.get("name2") else f"{d.get('name1','')} {d.get('last_name','')}"
-            ),
-            "last_report": last_report["quarter"] if last_report else None,
+            "full_name": client_full_name(d),
+            "last_report": last_q,
             "last_report_date": last_report["created_at"][:10] if last_report else None,
+            "status": status,
+            "status_label": STATUS_LABELS[status],
             "updated_at": r["updated_at"][:10],
         })
+
+    recent_rows = conn.execute("""
+        SELECT r.id, r.client_id, r.quarter, r.created_at, c.data AS client_data
+        FROM reports r
+        JOIN clients c ON c.id = r.client_id
+        ORDER BY r.id DESC
+        LIMIT 10
+    """).fetchall()
+    recent_reports = []
+    for r in recent_rows:
+        d = json.loads(r["client_data"])
+        recent_reports.append({
+            "id": r["id"],
+            "client_id": r["client_id"],
+            "client_name": client_full_name(d),
+            "quarter": r["quarter"],
+            "date": r["created_at"][:10],
+            "is_current": r["quarter"] == cur_q,
+        })
+
+    counts = {
+        "total":     len(clients),
+        "completed": sum(1 for c in clients if c["status"] == "completed"),
+        "pending":   sum(1 for c in clients if c["status"] in ("pending", "none")),
+        "missing":   sum(1 for c in clients if c["status"] == "missing"),
+    }
+
     conn.close()
-    return render_template("index.html", clients=clients)
+    return render_template(
+        "index.html",
+        clients=clients,
+        recent_reports=recent_reports,
+        current_quarter=cur_q,
+        counts=counts,
+    )
 
 
 @app.route("/client/new", methods=["GET", "POST"])
