@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Generate Report — AW Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  :root { --blue:#1B4F8C; --blue-light:#2E6DB4; --blue-pale:#EBF2FA; --green:#2D7A3A; --red:#B22222; --gray:#F5F6F8; --gray-med:#E2E5EA; --gray-dark:#6B7280; --dark:#111827; --shadow:0 1px 3px rgba(0,0,0,.08),0 4px 12px rgba(0,0,0,.06); --radius:12px; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',sans-serif; background:#F0F3F8; color:var(--dark); }
+  nav { background:var(--blue); padding:0 40px; height:60px; display:flex; align-items:center; gap:16px; }
+  .nav-back { color:rgba(255,255,255,.7); text-decoration:none; font-size:13px; }
+  .nav-back:hover { color:white; }
+  .nav-brand { color:white; font-family:'DM Serif Display',serif; font-size:18px; }
+  .container { max-width:800px; margin:0 auto; padding:40px 24px; }
+
+  .page-header { margin-bottom:28px; }
+  .page-title { font-family:'DM Serif Display',serif; font-size:26px; }
+  .page-sub { color:var(--gray-dark); font-size:14px; margin-top:4px; }
+
+  .card { background:white; border-radius:var(--radius); padding:28px 32px; box-shadow:var(--shadow); margin-bottom:20px; }
+  .card-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.7px; color:var(--blue); margin-bottom:20px; padding-bottom:12px; border-bottom:1.5px solid var(--gray-med); display:flex; align-items:center; gap:8px; }
+  .card-icon { width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .icon-green { background:#DCFCE7; }
+  .icon-red { background:#FEE2E2; }
+  .icon-blue { background:var(--blue-pale); }
+
+  .prefilled-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+  .prefilled-item { background:var(--gray); border-radius:8px; padding:12px 16px; }
+  .prefilled-label { font-size:11px; font-weight:600; color:var(--gray-dark); text-transform:uppercase; letter-spacing:.5px; }
+  .prefilled-value { font-size:16px; font-weight:700; color:var(--blue); margin-top:2px; }
+
+  .balance-section { margin-top:12px; }
+  .balance-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:12px; }
+  .form-group { display:flex; flex-direction:column; gap:6px; }
+  label { font-size:12px; font-weight:600; color:var(--gray-dark); text-transform:uppercase; letter-spacing:.5px; }
+  .input-wrap { position:relative; }
+  .input-wrap input { width:100%; padding:10px 14px 10px 28px; border:1.5px solid var(--gray-med); border-radius:8px; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:600; color:var(--dark); transition:.15s; }
+  .input-wrap input:focus { outline:none; border-color:var(--blue-light); box-shadow:0 0 0 3px rgba(46,109,180,.12); }
+  .input-prefix { position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:13px; color:var(--gray-dark); font-weight:600; pointer-events:none; }
+  .last-val { font-size:11px; color:var(--gray-dark); margin-top:3px; }
+  .last-val span { color:var(--blue); font-weight:600; cursor:pointer; }
+  .last-val span:hover { text-decoration:underline; }
+
+  /* Live calc panel */
+  .calc-panel { background:var(--blue); border-radius:var(--radius); padding:24px 28px; color:white; margin-bottom:20px; }
+  .calc-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.7px; opacity:.7; margin-bottom:16px; }
+  .calc-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  .calc-item label { font-size:11px; opacity:.7; text-transform:uppercase; letter-spacing:.5px; }
+  .calc-item .val { font-size:22px; font-weight:700; margin-top:3px; font-family:'DM Serif Display',serif; }
+  .calc-item .val.positive { color:#6EE7B7; }
+  .calc-item .val.total { color:#FCD34D; }
+
+  .quarter-select { padding:10px 14px; border:1.5px solid var(--gray-med); border-radius:8px; font-family:'DM Sans',sans-serif; font-size:14px; }
+
+  .actions { display:flex; gap:12px; margin-top:4px; }
+  .btn-primary { background:var(--blue); color:white; border:none; padding:13px 30px; border-radius:9px; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:15px; font-weight:700; transition:.2s; }
+  .btn-primary:hover { background:var(--blue-light); }
+  .btn-cancel { background:transparent; color:var(--gray-dark); border:1.5px solid var(--gray-med); padding:13px 24px; border-radius:9px; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:14px; text-decoration:none; display:inline-flex; align-items:center; }
+
+  /* Download section */
+  .download-section { display:none; background:white; border-radius:var(--radius); padding:28px 32px; box-shadow:var(--shadow); margin-bottom:20px; border:2px solid #DCFCE7; }
+  .download-section.show { display:block; }
+  .download-title { font-size:16px; font-weight:700; color:#166534; margin-bottom:20px; display:flex; align-items:center; gap:8px; }
+  .download-btns { display:flex; gap:14px; }
+  .btn-download { display:inline-flex; align-items:center; gap:8px; padding:13px 24px; border-radius:9px; border:none; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:700; text-decoration:none; transition:.2s; }
+  .btn-sacs { background:#2D7A3A; color:white; }
+  .btn-sacs:hover { background:#1e5228; }
+  .btn-tcc { background:var(--blue); color:white; }
+  .btn-tcc:hover { background:var(--blue-light); }
+
+  /* Validation state */
+  .input-wrap input.missing { border-color:#DC2626; background:#FEF2F2; }
+  .input-wrap input.missing:focus { box-shadow:0 0 0 3px rgba(220,38,38,.15); }
+  .form-group.missing label { color:#DC2626; }
+  .err-toast { position:fixed; top:20px; right:20px; background:#DC2626; color:white; padding:14px 22px; border-radius:10px; font-weight:600; font-size:14px; display:none; z-index:999; box-shadow:0 8px 24px rgba(220,38,38,.25); }
+  .err-toast.show { display:block; }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-back">← Dashboard</a>
+  <div class="nav-brand">Windbrook Solutions</div>
+</nav>
+<div class="err-toast" id="err-toast"></div>
+<div class="container">
+  <div class="page-header">
+    <div class="page-title">Generate Quarterly Report</div>
+    <div class="page-sub">
+      {{ client.name1 }}{% if client.name2 %} & {{ client.name2 }}{% endif %} {{ client.last_name }}
+    </div>
+  </div>
+
+  <!-- Quarter selector -->
+  <div class="card">
+    <div class="card-title"><div class="card-icon icon-blue">📅</div>Report Period</div>
+    <div class="form-group" style="max-width:240px">
+      <label>Quarter</label>
+      <select class="quarter-select" id="quarter">
+        <option>Q1 2026</option><option>Q2 2026</option><option>Q3 2026</option><option>Q4 2026</option>
+        <option>Q1 2025</option><option>Q2 2025</option><option>Q3 2025</option><option>Q4 2025</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Pre-filled SACS data -->
+  <div class="card">
+    <div class="card-title"><div class="card-icon icon-green">💚</div>SACS — Cash Flow (Pre-filled)</div>
+    <div class="prefilled-grid">
+      <div class="prefilled-item">
+        <div class="prefilled-label">Monthly Inflow</div>
+        <div class="prefilled-value">${{ "{:,.0f}".format(client.monthly_inflow) }}</div>
+      </div>
+      <div class="prefilled-item">
+        <div class="prefilled-label">Monthly Outflow</div>
+        <div class="prefilled-value">${{ "{:,.0f}".format(client.monthly_outflow) }}</div>
+      </div>
+    </div>
+    <div class="balance-section">
+      <div class="balance-row">
+        <div class="form-group">
+          <label>Private Reserve Balance</label>
+          <div class="input-wrap"><span class="input-prefix">$</span>
+            <input type="number" id="private_reserve" oninput="recalc()" value="{{ last_balances.get('private_reserve','') }}" placeholder="0">
+          </div>
+          {% if last_balances.get('private_reserve') %}<div class="last-val">Last quarter: <span onclick="useVal('private_reserve','{{ last_balances.get('private_reserve','') }}')">${{ "{:,.0f}".format(last_balances.get('private_reserve',0)|float) }}</span></div>{% endif %}
+        </div>
+        <div class="form-group">
+          <label>Schwab Investment Balance</label>
+          <div class="input-wrap"><span class="input-prefix">$</span>
+            <input type="number" id="schwab_balance" oninput="recalc()" value="{{ last_balances.get('schwab_balance','') }}" placeholder="0">
+          </div>
+          {% if last_balances.get('schwab_balance') %}<div class="last-val">Last quarter: <span onclick="useVal('schwab_balance','{{ last_balances.get('schwab_balance','') }}')">${{ "{:,.0f}".format(last_balances.get('schwab_balance',0)|float) }}</span></div>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TCC retirement balances -->
+  <div class="card">
+    <div class="card-title"><div class="card-icon icon-blue">🏦</div>TCC — Retirement Account Balances</div>
+    <div class="balance-section">
+      {% for acct in client.retirement_accounts %}{% set i = loop.index0 %}
+      <div class="balance-row">
+        <div class="form-group">
+          <label>{{ acct.type }} ({{ client.name1 if acct.owner == 'client1' else client.name2 }}) ••••{{ acct.last4 }}</label>
+          <div class="input-wrap"><span class="input-prefix">$</span>
+            <input type="number" id="ret_{{ i }}" oninput="recalc()" value="{{ last_balances.get('ret_'~i,'') }}" placeholder="0">
+          </div>
+          {% set lv = last_balances.get('ret_'~i) %}{% if lv %}<div class="last-val">Last quarter: <span onclick="useVal('ret_{{ i }}','{{ lv }}')">${{ "{:,.0f}".format(lv|float) }}</span></div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- TCC non-retirement balances -->
+  <div class="card">
+    <div class="card-title"><div class="card-icon icon-blue">📈</div>TCC — Non-Retirement Accounts</div>
+    <div class="balance-section">
+      {% for acct in client.non_retirement_accounts %}{% set i = loop.index0 %}
+      <div class="balance-row">
+        <div class="form-group">
+          <label>{{ acct.type }} ••••{{ acct.last4 }}</label>
+          <div class="input-wrap"><span class="input-prefix">$</span>
+            <input type="number" id="nret_{{ i }}" oninput="recalc()" value="{{ last_balances.get('nret_'~i,'') }}" placeholder="0">
+          </div>
+          {% set lv = last_balances.get('nret_'~i) %}{% if lv %}<div class="last-val">Last quarter: <span onclick="useVal('nret_{{ i }}','{{ lv }}')">${{ "{:,.0f}".format(lv|float) }}</span></div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+      <div class="balance-row">
+        <div class="form-group">
+          <label>Trust / Property Value (Zillow)</label>
+          <div class="input-wrap"><span class="input-prefix">$</span>
+            <input type="number" id="trust_value" oninput="recalc()" value="{{ last_balances.get('trust_value','') }}" placeholder="0">
+          </div>
+          {% set lv = last_balances.get('trust_value') %}{% if lv %}<div class="last-val">Last quarter: <span onclick="useVal('trust_value','{{ lv }}')">${{ "{:,.0f}".format(lv|float) }}</span></div>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Liabilities -->
+  {% if client.liabilities %}
+  <div class="card">
+    <div class="card-title"><div class="card-icon icon-red">⚠️</div>Liabilities</div>
+    <div class="balance-section">
+      {% for liab in client.liabilities %}{% set i = loop.index0 %}
+      <div class="balance-row">
+        <div class="form-group">
+          <label>{{ liab.type }} ({{ liab.rate }}%) ••••{{ liab.last4 }}</label>
+          <div class="input-wrap"><span class="input-prefix">$</span>
+            <input type="number" id="liab_{{ i }}" oninput="recalc()" value="{{ last_balances.get('liab_'~i,'') }}" placeholder="0">
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Live calc panel -->
+  <div class="calc-panel">
+    <div class="calc-title">⚡ Live Calculations</div>
+    <div class="calc-grid">
+      <div class="calc-item"><label>Monthly Excess</label><div class="val positive" id="c-excess">$0</div></div>
+      <div class="calc-item"><label>PR Target</label><div class="val" id="c-target">$0</div></div>
+      <div class="calc-item"><label>Net Worth (Grand Total)</label><div class="val total" id="c-total">$0</div></div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions">
+    <button class="btn-primary" onclick="submitReport()">Generate Reports</button>
+    <a href="/" class="btn-cancel">Cancel</a>
+  </div>
+
+  <!-- Download section (appears after generation) -->
+  <div class="download-section" id="download-section">
+    <div class="download-title">✓ Reports generated successfully!</div>
+    <div class="download-btns">
+      <a href="#" id="dl-sacs" class="btn-download btn-sacs">
+        ↓ Download SACS PDF
+      </a>
+      <a href="#" id="dl-tcc" class="btn-download btn-tcc">
+        ↓ Download TCC PDF
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+const inflow = {{ client.monthly_inflow }};
+const outflow = {{ client.monthly_outflow }};
+const deductibles = {{ client.insurance_deductibles or 0 }};
+const numRet = {{ client.retirement_accounts|length }};
+const numNret = {{ client.non_retirement_accounts|length }};
+const numLiab = {{ (client.liabilities or [])|length }};
+const retAccounts = {{ client.retirement_accounts | tojson }};
+
+function fmt(n) { return '$' + Math.round(n).toLocaleString(); }
+function val(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
+function rawVal(id) { return document.getElementById(id)?.value ?? ''; }
+function useVal(id, v) {
+  const el = document.getElementById(id);
+  el.value = v;
+  el.classList.remove('missing');
+  el.closest('.form-group')?.classList.remove('missing');
+  recalc();
+}
+
+function requiredIds() {
+  const ids = ['private_reserve', 'schwab_balance', 'trust_value'];
+  for (let i = 0; i < numRet; i++) ids.push(`ret_${i}`);
+  for (let i = 0; i < numNret; i++) ids.push(`nret_${i}`);
+  for (let i = 0; i < numLiab; i++) ids.push(`liab_${i}`);
+  return ids;
+}
+
+function clearMissing() {
+  document.querySelectorAll('.missing').forEach(el => el.classList.remove('missing'));
+}
+
+function flashErr(msg) {
+  const t = document.getElementById('err-toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// Clear "missing" highlight as soon as user types in a field
+document.addEventListener('input', e => {
+  if (e.target.matches('input[type=number]') && e.target.value.trim() !== '') {
+    e.target.classList.remove('missing');
+    e.target.closest('.form-group')?.classList.remove('missing');
+  }
+});
+
+function recalc() {
+  const excess = inflow - outflow;
+  const target = (6 * outflow) + deductibles;
+  let ret1 = 0, ret2 = 0;
+  for (let i = 0; i < numRet; i++) {
+    if (retAccounts[i].owner === 'client1') ret1 += val(`ret_${i}`);
+    else ret2 += val(`ret_${i}`);
+  }
+  let nret = 0;
+  for (let i = 0; i < numNret; i++) nret += val(`nret_${i}`);
+  const trust = val('trust_value');
+  const grand = ret1 + ret2 + nret + trust;
+  document.getElementById('c-excess').textContent = fmt(excess);
+  document.getElementById('c-target').textContent = fmt(target);
+  document.getElementById('c-total').textContent = fmt(grand);
+}
+recalc();
+
+async function submitReport() {
+  clearMissing();
+  const missing = [];
+  for (const id of requiredIds()) {
+    if (rawVal(id).trim() === '') {
+      const el = document.getElementById(id);
+      if (el) {
+        el.classList.add('missing');
+        el.closest('.form-group')?.classList.add('missing');
+        missing.push(id);
+      }
+    }
+  }
+  if (missing.length) {
+    flashErr(`Complete ${missing.length} missing field${missing.length>1?'s':''} before generating`);
+    document.querySelector('.missing')?.scrollIntoView({behavior:'smooth', block:'center'});
+    return;
+  }
+
+  const balances = { quarter: document.getElementById('quarter').value };
+  balances.private_reserve = val('private_reserve');
+  balances.schwab_balance = val('schwab_balance');
+  balances.trust_value = val('trust_value');
+  for (let i = 0; i < numRet; i++) balances[`ret_${i}`] = val(`ret_${i}`);
+  for (let i = 0; i < numNret; i++) balances[`nret_${i}`] = val(`nret_${i}`);
+  for (let i = 0; i < numLiab; i++) balances[`liab_${i}`] = val(`liab_${i}`);
+
+  const res = await fetch(window.location.href, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(balances)
+  });
+  const j = await res.json();
+  if (j.ok) {
+    document.getElementById('dl-sacs').href = `/report/${j.report_id}/pdf/sacs`;
+    document.getElementById('dl-tcc').href = `/report/${j.report_id}/pdf/tcc`;
+    document.getElementById('download-section').classList.add('show');
+    document.getElementById('download-section').scrollIntoView({behavior:'smooth'});
+  }
+}
+</script>
+</body>
+</html>

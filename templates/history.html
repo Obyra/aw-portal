@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Report History — AW Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  :root { --blue:#1B4F8C; --blue-light:#2E6DB4; --gray:#F5F6F8; --gray-med:#E2E5EA; --gray-dark:#6B7280; --dark:#111827; --shadow:0 1px 3px rgba(0,0,0,.08),0 4px 12px rgba(0,0,0,.06); --radius:12px; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'DM Sans',sans-serif; background:#F0F3F8; color:var(--dark); }
+  nav { background:var(--blue); padding:0 40px; height:60px; display:flex; align-items:center; gap:16px; }
+  .nav-back { color:rgba(255,255,255,.7); text-decoration:none; font-size:13px; } .nav-back:hover { color:white; }
+  .nav-brand { color:white; font-family:'DM Serif Display',serif; font-size:18px; }
+  .container { max-width:700px; margin:0 auto; padding:40px 24px; }
+  .page-title { font-family:'DM Serif Display',serif; font-size:26px; margin-bottom:6px; }
+  .page-sub { color:var(--gray-dark); font-size:14px; margin-bottom:28px; }
+  .card { background:white; border-radius:var(--radius); padding:20px 28px; box-shadow:var(--shadow); margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; }
+  .rpt-info h3 { font-size:16px; font-weight:700; }
+  .rpt-info p { font-size:13px; color:var(--gray-dark); margin-top:3px; }
+  .rpt-btns { display:flex; gap:10px; }
+  .btn { padding:8px 16px; border-radius:8px; border:none; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; text-decoration:none; }
+  .btn-sacs { background:#DCFCE7; color:#166534; }
+  .btn-tcc { background:#EBF2FA; color:var(--blue); }
+  .empty { text-align:center; padding:60px; color:var(--gray-dark); }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-back">← Dashboard</a>
+  <div class="nav-brand">Windbrook Solutions</div>
+</nav>
+<div class="container">
+  <div class="page-title">Report History</div>
+  <div class="page-sub">{{ client.name1 }}{% if client.name2 %} & {{ client.name2 }}{% endif %} {{ client.last_name }}</div>
+  {% if not reports %}
+  <div class="empty">No reports generated yet for this client.</div>
+  {% endif %}
+  {% for r in reports %}
+  <div class="card">
+    <div class="rpt-info">
+      <h3>{{ r.quarter }}</h3>
+      <p>Generated {{ r.created_at[:10] }}</p>
+    </div>
+    <div class="rpt-btns">
+      <a href="/report/{{ r.id }}/pdf/sacs" class="btn btn-sacs">↓ SACS</a>
+      <a href="/report/{{ r.id }}/pdf/tcc" class="btn btn-tcc">↓ TCC</a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+</body>
+</html>
