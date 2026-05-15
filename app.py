@@ -142,6 +142,13 @@ def inject_user():
     return {"current_user": None}
 
 
+# ─── Health check (public, no auth) ───────────────────────────────────────────
+
+@app.route("/health")
+def health():
+    return "ok", 200
+
+
 # ─── Auth routes ──────────────────────────────────────────────────────────────
 
 @app.route("/login", methods=["GET", "POST"])
