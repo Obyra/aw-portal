@@ -16,7 +16,7 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-DB_PATH = "portal.db"
+DB_PATH = os.environ.get("DATABASE_PATH", "portal.db")
 
 ROLES = ("admin", "planner", "assistant")
 
